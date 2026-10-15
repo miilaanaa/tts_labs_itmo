@@ -102,7 +102,6 @@ class G2P:
         self.mfa_dict = mfa_dict or {}
 
         # Индекс ударений: word -> номер ударного слога + префиксный индекс
-        # для быстрого поиска похожих слов
         self.stress_examples: dict[str, int] = {}
         self.stress_index: dict[str, list[str]] = defaultdict(list)
         for word, pronunciations in self.lexicon.items():
@@ -120,8 +119,8 @@ class G2P:
     def infer_stress_from_phones(self, word: str, phones: list[str]) -> int | None:
         """Оценка индекса ударного слога по фонемам train-слова.
 
-        Идея: в русском безударные гласные редуцированы (ɐ, ə, ɪ, ʊ),
-        ударные — полные (a, o, e, i, u, ы...). Если в слове ровно
+        В русском безударные гласные редуцированы (ɐ, ə, ɪ, ʊ),
+        ударные — полные (a, o, e, i, u, ɨ...). Если в слове ровно
         одна «полная» гласная — она и есть ударная.
         """
         letters = [c for c in word if c in RUSSIAN_VOWELS]
@@ -209,17 +208,14 @@ class G2P:
             syllable = vowel_to_syllable[pos]
             stressed = syllable == stressed_syllable
             if stressed:
-                # Безударный «и» после ж/ш/ц произносится как ɨ
                 if char == 'и' and preceding in 'жшц':
                     return 'ɨ'
                 return base
             # Безударные позиции — редукция
             if char in {'о', 'а'}:
                 if syllable == stressed_syllable - 1:
-                    # 1-й предударный слог → ɐ
                     return 'ɐ'
                 if pos == 0 and syllable < stressed_syllable:
-                    # Абсолютное начало слова перед ударением → ɐ
                     return 'ɐ'
                 return 'ə'
             if char in {'е', 'я', 'и'}:
@@ -240,36 +236,30 @@ class G2P:
             prev_char = word[i - 1] if i > 0 else ''
             next_char = word[i + 1] if i + 1 < len(word) else ''
 
-            # Мягкий/твёрдый знак — не порождают фонем
             if char in {'ь', 'ъ'}:
                 i += 1
                 continue
 
-            # Аффриката «дж»
             if word.startswith('дж', i):
                 phones.append('dʐ')
                 i += 2
                 continue
 
-            # Удвоенные согласные → одна фонема
             if char == prev_char and char not in RUSSIAN_VOWELS and i > 0:
                 i += 1
                 continue
 
-            # Йотированная гласная в начале слова или после гласной/ь/ъ
             if char in iotated and (i == 0 or prev_char in RUSSIAN_VOWELS
                                     or prev_char in {'ь', 'ъ'}):
                 phones.extend(['j', vowel_phone(char, i, iotated[char], prev_char)])
                 i += 1
                 continue
 
-            # Смягчение согласного перед гласными переднего ряда или ь
             if char in SOFT_CONSONANTS and (next_char in soft_vowels or next_char == 'ь'):
                 phones.append(SOFT_CONSONANTS[char])
                 i += 1
                 continue
 
-            # Базовая буква
             if char in LETTER_TO_PHONE:
                 base = LETTER_TO_PHONE[char]
                 if char in RUSSIAN_VOWELS:
@@ -313,7 +303,11 @@ class G2P:
 # ---- Загрузка MFA-словаря ----
 
 def load_mfa_dictionary(path: str) -> dict[str, str]:
-    """Read a Russian MFA pronunciation dictionary (first variant per word)."""
+    """Read a Russian MFA pronunciation dictionary (first variant per word).
+
+    Долгие согласные (Xː) приводятся к кратким (X): в целевом инвентаре
+    ``common/phones_mfa.txt`` долгих фонем нет.
+    """
     mfa_dict: dict[str, str] = {}
     with open(path, encoding='utf-8') as fh:
         for line in fh:
@@ -322,6 +316,10 @@ def load_mfa_dictionary(path: str) -> dict[str, str]:
                 continue
             word = unicodedata.normalize('NFC', parts[0]).lower()
             phones = unicodedata.normalize('NFC', parts[-1])
+            # Убираем диакритику долготы: ɕː → ɕ
+            phones = ' '.join(
+                p[:-1] if p.endswith('ː') else p for p in phones.split()
+            )
             if word not in mfa_dict:
                 mfa_dict[word] = phones
     return mfa_dict
