@@ -272,7 +272,7 @@ def main() -> None:
 
     model = ForwardTTS(config, ap, tokenizer, speaker_manager=None)
     trainer = Trainer(
-        TrainerArgs(),
+        TrainerArgs(restore_path="runs/baseline/baseline-November-17-2026_12+58AM-988aa3d/checkpoint_24120.pth"),
         config,
         str(output_path),
         model=model,

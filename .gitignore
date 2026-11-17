@@ -15,3 +15,11 @@ __pycache__/
 .idea/
 .vscode/
 .DS_Store
+
+# Lab 3/4 data (too large for Git)
+labs/lab3_g2p/data/
+labs/lab4_acoustic/data/RUSLAN/
+labs/lab4_acoustic/data/metadata_phones*.csv
+labs/lab4_acoustic/runs/
+labs/lab4_acoustic/train*.log
+labs/lab4_acoustic/*.bak
